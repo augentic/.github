@@ -1,26 +1,38 @@
-## Augentic
+# Augentic
 
-**au·gen·tic** *(adj.)* /ɔːˈdʒɛn.tɪk/ — **intent-preserving AI augmentation**: hand-crafted software systems enhanced or extended (by tools, systems, or context) **without losing the “real” essence**.
+**au·gen·tic** *(adj.)* /ɔːˈdʒɛn.tɪk/ — **intent-preserving AI augmentation**: hand-crafted
+software systems enhanced or extended (by tools, systems, or context) **without losing the
+“real” essence**.
 
-**Augentic** is focussed on the integration of AI, automation, and developer tooling to **amplify capability without distorting provenance, authorship, or ground truth**.
+**Augentic** is focussed on the integration of AI, automation, and developer tooling to **amplify
+capability without distorting provenance, authorship, or ground truth**.
 
-We build systems where agents contribute leverage, but humans retain ownership:
+Build systems where agents contribute leverage, but humans retain ownership:
 
-- **Human-owned outcomes**: you stay accountable; changes are understandable and reviewable.
-- **Intent-preserving assistance**: the tool helps, but doesn’t rewrite goals, invent facts, or “take the wheel.”
-- **Traceable augmentation**: key claims and changes can be tied back to sources, inputs, and decisions.
+- **Human-owned**: you stay accountable; changes are understandable and reviewable.
+- **Intent-preserving**: the tool helps, but doesn’t rewrite goals, invent facts, or “take the
+  wheel.”
+- **Traceable**: key claims and changes can be tied back to sources, inputs, and decisions.
 
 ## What we care about
 
-- **Provenance**: key outputs are attributable (sources, lineage, and “why this”).  
-- **Control**: explicit actions, predictable changes, easy rollback.  
-- **Verifiability**: checks, tests, and guardrails around generated work.  
-- **Alignment**: constraints reflect real intent (policies, style, specs, reality).
+- **Safety**: built on [Wasmtime], the WebAssembly runtime provides strong isolation and
+  sandboxing.
+- **Performance**: we use Rust to build fast, efficient, and reliable software.
+- **Verifiability**: designed around the inclusion of "humans in the loop", each step in the 
+  process of transforming requirements into working software is verifiable.
+- **Craftsmanship**: the runtime plane is hand-crafted to provide a safe and reliable foundation
+  for generated business logic.
 
 ## What you’ll find here
 
-Open-source building blocks and experiments in **augentic** systems: tools that make work **faster and more capable**, while staying **traceable, verifiable, and aligned**.
+Open-source building blocks for building software using **agentic augmentation**. Tools to help
+humans build software **faster, safer, and for a lower cost**, without sacrificing **traceable,
+verifiable, and maintainable** code.
 
 ## Working with us
 
-If you’re building assistance that should be **high leverage, low hallucination, audit-trails-by-default**, you’re in the right place.
+If you’re building assistance that should be **high leverage, low hallucination, 
+audit-trails-by-default**, you’re in the right place.
+
+[Wasmtime]: https://wasmtime.dev/
