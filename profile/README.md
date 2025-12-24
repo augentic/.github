@@ -7,8 +7,8 @@ software systems enhanced or extended (by tools, systems, or context) **without 
 **Augentic** is focussed on the integration of AI, automation, and developer tooling to **amplify
 capability without distorting provenance, authorship, or ground truth**.
 
-Build systems by leveraging the multiplying effect of agentic software delivery, while retaining
-human care and ownership.
+Build sophisticated systems by leveraging the multiplying effect of agentic software delivery, 
+all while retaining human care and ownership.
 
 ## What we care about
 
