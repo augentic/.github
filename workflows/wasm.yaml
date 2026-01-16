@@ -1,0 +1,86 @@
+# Builds and publishes a wasm guest.
+
+name: Publish Wasm Guest
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        type: string
+        required: true
+        description: The Cargo package name.
+      app-name:
+        type: string
+        description: The Container App name.
+      storage-account:
+        type: string
+        required: true
+        description: The Azure Storage Account to use for the wasm file.
+      resource-group:
+        type: string
+        required: true
+        description: The Azure Resource Group to use when restarting the Container App.
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ inputs.package }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        
+      - uses: credibil/pipeline/.github/actions/cargo-cache@main
+
+      - name: Build wasm component
+        run: cargo build --package ${{ inputs.package }} --release --target wasm32-wasip2
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Upload wasm
+        run: |
+          WASM_FILE=$(echo "${{ inputs.package }}" | tr - _)
+          APP_NAME=$(if [ -n "${{ inputs.app-name }}" ]; 
+            then echo "${{ inputs.app-name }}"; 
+            else echo "${{ inputs.package }}"; 
+          fi)
+
+          az storage file upload \
+            --account-name ${{ inputs.storage-account }} \
+            --share-name wasm \
+            --source ./target/wasm32-wasip1/release/$WASM_FILE.wasm \
+            --path $APP_NAME.wasm
+
+      - name: Restart Container App
+        run: |
+          APP_NAME=$(if [ -n "${{ inputs.app-name }}" ]; 
+            then echo "${{ inputs.app-name }}"; 
+            else echo "${{ inputs.package }}"; 
+          fi)
+
+          latestRevision=$(az containerapp revision list \
+            --name ca-$APP_NAME \
+            --resource-group ${{ inputs.resource-group }} \
+            --query '[?properties.active == `true`].name | @[0]')
+
+          az containerapp revision restart \
+            --name ca-$APP_NAME \
+            --resource-group ${{ inputs.resource-group }} \
+            --revision "${latestRevision//\"}"
