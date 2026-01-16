@@ -41,11 +41,11 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Set git identity
-        uses: credibil/pipeline/.github/actions/git-identity@main
+        uses: ./.github/actions/git-identity@main
 
       - name: Bump version
         id: patch
-        uses: credibil/pipeline/.github/actions/cargo-version@main
+        uses: ./.github/actions/cargo-version@main
         with:
           increment: patch
 
@@ -57,12 +57,11 @@ jobs:
       #     release-type: patch
 
       - name: Update release notes
-        uses: credibil/pipeline/.github/actions/release-notes@main
+        uses: ./.github/actions/release-notes@main
         with:
           release-type: patch
           version: ${{ steps.patch.outputs.version }}
           previous-version: ${{ steps.patch.outputs.previous-version }}
-          
 
       - name: Push changes
         run: git push origin HEAD:${{ github.ref_name }}

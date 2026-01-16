@@ -1,4 +1,4 @@
-# Publishes a release branch. 
+# Publishes a release branch.
 # The workflow tags and releases the selected branch.
 
 name: Publish Release
@@ -43,12 +43,12 @@ jobs:
           fetch-depth: 0
 
       - name: Set git identity
-        uses: credibil/pipeline/.github/actions/git-identity@main
+        uses: ./.github/actions/git-identity@main
 
       - name: Cargo version
         id: cargo
-        uses: credibil/pipeline/.github/actions/cargo-version@main
-        
+        uses: ./.github/actions/cargo-version@main
+
       - name: Date release notes
         run: |
           set -ex
