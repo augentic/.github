@@ -1,0 +1,70 @@
+name: Cargo version
+description: Get the version from Cargo.toml.
+
+inputs:
+  increment:
+    description: |
+      The version number or one of 'none', 'major', 'minor', 'patch'. 
+      If 'none', the current version is returned.
+    default: none
+
+outputs:
+  version:
+    description: Cargo version
+    value: ${{ steps.current.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Read current version
+      id: current
+      shell: bash
+      run: |
+        version=$(grep '^version =' Cargo.toml | head -n 1 | sed 's/.*"\(.*\)"/\1/')
+        echo "version=$version" >> $GITHUB_OUTPUT
+
+    # -------------------------------------------
+    # Only increment version when requested
+    # -------------------------------------------
+    - name: Increment version
+      if: ${{ inputs.increment != 'none' }}
+      id: increment
+      shell: bash
+      run: |
+        current=${{ steps.current.outputs.version }}
+
+        case "${{ inputs.increment }}" in
+          major)
+            IFS='.' read -r major minor patch <<< "$current"
+            version="$((major + 1)).0.0"
+            ;;
+          minor)
+            IFS='.' read -r major minor patch <<< "$current"
+            version="$major.$((minor + 1)).0"
+            ;;
+          *)
+            IFS='.' read -r major minor patch <<< "$current"
+            version="$major.$minor.$((patch + 1))"
+            ;;
+        esac
+
+        echo "version=$version" >> $GITHUB_OUTPUT
+
+    - name: Update workspace
+      if: ${{ inputs.increment != 'none' }}
+      shell: bash
+      run: |
+        version=${{ steps.increment.outputs.version }}
+
+        # update workspace version including workspace crate references
+        sed -i "s/^version = .*/version = \"$version\"/1" Cargo.toml
+        sed -Ei "s/(^.*path = .*), version = \"[0-9.]+\"(.*$)/\1, version = \"$version\"\2/g" Cargo.toml
+        sed -Ei "s/(^.*)version = \"[0-9.]+\", (.*)(path = .*$)/\1version = \"$version\", \2 \3/g" Cargo.toml
+        
+        # update version in RELEASES.md
+        sed -i "1 s/^.*$/## $version/" RELEASES.md
+
+        # update versions in member crates
+        cargo generate-lockfile
+
+        git commit -am "Increment Cargo version to $version"

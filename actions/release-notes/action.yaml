@@ -1,0 +1,124 @@
+name: Prepare release notes
+description: Prepare release notes for an upcoming release
+
+inputs:
+  version:
+    description: The version to use for release notes.
+    required: true
+  release-type:
+    description: One of 'major', 'minor', 'patch', or 'next'.
+    default: major
+
+runs:
+  using: composite
+  steps:
+    - name: Get previous version
+      if: ${{ inputs.previous-version == '' }}
+      id: previous
+      uses: actions/github-script@v8
+      with:
+        result-encoding: string
+        script: |
+          const tags = await github.rest.repos.listTags({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 2,
+          });
+          return tags.data[1]?.name ?? '';
+
+    - name: Generate release notes
+      if: ${{ inputs.release-type != 'next' }}
+      id: notes
+      uses: actions/github-script@v8
+      with:
+        result-encoding: string
+        script: |
+          const response = await github.rest.repos.generateReleaseNotes({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            previous_tag_name: "${{ steps.previous.outputs.result }}",
+            tag_name: "v${{ inputs.version }}",
+          })
+          return response.data.body;
+
+    # -------------------------------------------
+    # Major/minor
+    # -------------------------------------------
+    - name: Create RELEASES.md
+      if: ${{ inputs.release-type == 'major' }} || ${{ inputs.release-type == 'minor' }}
+      shell: bash
+      run: |
+        body=$(sed -n '/---/,$!p' RELEASES.md)
+        archive=$(sed -n '/---/,$p' RELEASES.md)
+
+        cat > RELEASES.md <<EOF
+        $body
+
+        ${{ steps.notes.outputs.result }}
+
+        $archive
+        EOF
+
+    # -------------------------------------------
+    # Patch
+    # -------------------------------------------
+    - name: Patch RELEASES.md
+      if: ${{ inputs.release-type == 'patch' }}
+      shell: bash
+      run: |
+        title=$(sed -n '1p' RELEASES.md)
+        previous=$(cat RELEASES.md)
+
+        cat > RELEASES.md <<EOF
+        $title
+
+        Unreleased
+
+        ## Fixed
+
+        ${{ steps.notes.outputs.result }}
+
+        ---
+
+        $previous
+        EOF
+
+    # -------------------------------------------
+    # Next
+    # -------------------------------------------
+    - name: Update archive list
+      if: ${{ inputs.release-type == 'next' }}
+      shell: bash
+      run: |
+        set -ex
+        title=$(sed -n '1p' RELEASES.md)
+        version=$(echo $title | sed 's/## //')
+        version_x=$(echo $version | sed 's/.$/x/')
+
+        sed -i "/ARCHIVE_START/a * [$version_x](https://github.com/${{ github.repository }}/blob/release-$version/RELEASES.md)" RELEASES.md
+
+    - name: Create next release notes
+      if: ${{ inputs.release-type == 'next' }}
+      shell: bash
+      run: |
+        set -ex
+
+        title=$(sed -n '1p' RELEASES.md)
+        archive=$(sed -n '/---/,$p' RELEASES.md)
+
+        cat > RELEASES.md <<EOF
+        $title
+
+        Unreleased
+
+        ### Added
+
+        ### Changed
+
+        $archive
+        EOF
+
+    - name: Update branch with changes
+      shell: bash
+      run: |
+        git commit -am "Update release notes for ${{ inputs.version }}"
