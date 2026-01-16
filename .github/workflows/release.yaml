@@ -1,0 +1,107 @@
+# Create a release.
+# The workflow creates a new release branch and updates the version of the main
+# branch.
+
+name: Create Release
+
+on:
+  workflow_call:
+    inputs:
+      # N.B Cargo version rules allow "minor" for breaking changes while on 0.x.y
+      increment:
+        description: The type of version bump to perform
+        default: minor
+        type: string
+    secrets:
+      CARGO_REGISTRIES_CREDIBIL_TOKEN:
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CARGO_REGISTRIES_CREDIBIL_TOKEN: ${{ secrets.CARGO_REGISTRIES_CREDIBIL_TOKEN }}
+
+jobs:
+  skip:
+    name: Skipped
+    if: github.ref_name != 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "This workflow only runs on the 'main' branch"
+          exit 1
+
+  # Create a new release branch from main (cut a release)
+  create:
+    name: Create release
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Git identity
+        uses: credibil/pipeline/.github/actions/git-identity@main
+
+      - name: Release version
+        id: release
+        uses: credibil/pipeline/.github/actions/cargo-version@main
+
+      - name: Update branch release notes
+        uses: credibil/pipeline/.github/actions/release-notes@main
+        with:
+          release-type: major
+          version: ${{ steps.release.outputs.version }}
+
+      - name: Push to release branch
+        run: git push origin HEAD:release-${{ steps.release.outputs.version }}
+
+  # Bump the version and create a PR to merge it back into 'main'
+  next:
+    name: Next release
+    runs-on: ubuntu-latest
+    needs: create
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Git identity
+        uses: credibil/pipeline/.github/actions/git-identity@main
+
+      - name: Bump version
+        id: next
+        uses: credibil/pipeline/.github/actions/cargo-version@main
+        with:
+          increment: ${{ inputs.increment }}
+
+      - name: Update release notes for next version
+        uses: credibil/pipeline/.github/actions/release-notes@main
+        with:
+          release-type: next
+          version: ${{ steps.next.outputs.version }}
+
+      - name: Branch to update 'main'
+        run: git push origin HEAD:ci/next-${{ steps.next.outputs.version }}
+
+      - name: PR to update 'main'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ci/next-${{ steps.next.outputs.version }}
+          title: Bump to ${{ steps.next.outputs.version }}
+          body: |
+            This pull request has been triggered by the creation of a new [release branch][branch]. 
+
+            Specifically, it merges the new version number (bumped from ${{ needs.create.outputs.version }} to
+            ${{ steps.next.outputs.version }}) back into the `main` branch.
+
+            Maintainers should review the [release notes][RELEASES.md] for ${{ needs.create.outputs.version }}
+            and make updates directly to the [release branch][branch].
+
+            If any issues arise on the `main` branch before the release is made then the issue should be fixed
+            on `main` and backported to the `release-${{ needs.create.outputs.version }}` branch.
+
+            [RELEASES.md]: https://github.com/${{ github.repository }}/blob/release-${{ needs.create.outputs.version }}/RELEASES.md
+            [branch]: https://github.com/${{ github.repository }}/tree/release-${{ needs.create.outputs.version }}

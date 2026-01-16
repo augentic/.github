@@ -1,0 +1,87 @@
+# Publishes a release branch. 
+# The workflow tags and releases the selected branch.
+
+name: Publish Release
+
+on:
+  workflow_call:
+    inputs:
+      artifacts:
+        description: Release artifacts to attach to the release
+        type: string
+        required: false
+    outputs:
+      version:
+        description: The release version
+        value: ${{ jobs.tag.outputs.version }}
+
+permissions:
+  contents: write
+
+jobs:
+  skip:
+    name: Skipped
+    if: startsWith(github.ref_name, 'release-') == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "This workflow only runs on the 'release-*' branches"
+          exit 1
+
+  tag:
+    name: Tag release
+    if: startsWith(github.ref_name, 'release-')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.new_tag }}
+      version: ${{ steps.cargo.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set git identity
+        uses: credibil/pipeline/.github/actions/git-identity@main
+
+      - name: Cargo version
+        id: cargo
+        uses: credibil/pipeline/.github/actions/cargo-version@main
+        
+      - name: Date release notes
+        run: |
+          set -ex
+          sed -i "s/^Unreleased/Released $(date +'%Y-%m-%d')/" RELEASES.md
+          git commit -am "Release ${{ steps.cargo.outputs.version }}"
+          git push origin
+
+      - name: Output release notes
+        id: notes
+        run: |
+          notes=$(cat RELEASES.md)
+          {
+            echo 'notes<<EOF'
+            echo "${notes}"
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Bump version and push tag
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ steps.cargo.outputs.version }}
+
+  release:
+    name: Create GitHub release
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.tag.outputs.tag }}
+          name: Release ${{ needs.tag.outputs.tag }}
+          body: ${{ needs.tag.outputs.notes }}
+          immutableCreate: true
+          artifacts: ${{ inputs.artifacts }}
