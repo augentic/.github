@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
 
       - name: Publish workspace crates
         if: startsWith(github.ref_name, 'release-')

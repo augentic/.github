@@ -43,11 +43,11 @@ jobs:
           fetch-depth: 0
 
       - name: Set git identity
-        uses: ./.github/actions/git-identity@main
+        uses: augentic/.github/.github/actions/git-identity@main
 
       - name: Cargo version
         id: cargo
-        uses: ./.github/actions/cargo-version@main
+        uses: augentic/.github/.github/actions/cargo-version@main
 
       - name: Date release notes
         run: |

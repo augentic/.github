@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - run: cargo fetch
 
   clippy:
@@ -37,7 +37,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - run: cargo clippy --all-features
 
   fmt:
@@ -46,7 +46,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - run: |
           rustup component add --toolchain nightly rustfmt
           cargo +nightly fmt --all --check
@@ -57,7 +57,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - uses: taiki-e/install-action@nextest
       - run: cargo nextest run --tests --all-features --no-tests=pass
 
@@ -67,7 +67,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - name: Check if library target exists
         id: lib
         run: |
@@ -85,7 +85,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-vet
@@ -97,7 +97,7 @@ jobs:
   #   needs: fetch
   #   steps:
   #     - uses: actions/checkout@v5
-  #     - uses: ./.github/actions/cargo-cache@main
+  #     - uses: augentic/.github/.github/actions/cargo-cache@main
   #     - run: |
   #        rustup toolchain install nightly --component miri
   #        rustup override set nightly
@@ -111,7 +111,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - run: cargo install --locked --git https://github.com/kbknapp/cargo-outdated
         env:
           CARGO_TARGET_DIR: ~/.cargo/bin
@@ -127,7 +127,7 @@ jobs:
     needs: fetch
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/cargo-cache@main
+      - uses: augentic/.github/.github/actions/cargo-cache@main
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           arguments: --workspace

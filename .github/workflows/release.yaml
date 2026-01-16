@@ -44,14 +44,14 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Git identity
-        uses: ./.github/actions/git-identity@main
+        uses: augentic/.github/.github/actions/git-identity@main
 
       - name: Release version
         id: release
-        uses: ./.github/actions/cargo-version@main
+        uses: augentic/.github/.github/actions/cargo-version@main
 
       - name: Update branch release notes
-        uses: ./.github/actions/release-notes@main
+        uses: augentic/.github/.github/actions/release-notes@main
         with:
           release-type: major
           version: ${{ steps.release.outputs.version }}
@@ -68,16 +68,16 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Git identity
-        uses: ./.github/actions/git-identity@main
+        uses: augentic/.github/.github/actions/git-identity@main
 
       - name: Bump version
         id: next
-        uses: ./.github/actions/cargo-version@main
+        uses: augentic/.github/.github/actions/cargo-version@main
         with:
           increment: ${{ inputs.increment }}
 
       - name: Update release notes for next version
-        uses: ./.github/actions/release-notes@main
+        uses: augentic/.github/.github/actions/release-notes@main
         with:
           release-type: next
           version: ${{ steps.next.outputs.version }}
