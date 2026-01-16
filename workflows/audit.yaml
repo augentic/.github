@@ -12,8 +12,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5
-        
-      - uses: credibil/pipeline/.github/actions/cargo-cache@main
+
+      - uses: ./.github/actions/cargo-cache@main
 
       - uses: rustsec/audit-check@v2
         with:

@@ -41,8 +41,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-        
-      - uses: credibil/pipeline/.github/actions/cargo-cache@main
+
+      - uses: ./.github/actions/cargo-cache@main
 
       - name: Build wasm component
         run: cargo build --package ${{ inputs.package }} --release --target wasm32-wasip2
