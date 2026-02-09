@@ -61,7 +61,6 @@ jobs:
         with:
           release-type: patch
           version: ${{ steps.patch.outputs.version }}
-          previous-version: ${{ steps.patch.outputs.previous-version }}
 
       - name: Push changes
         run: git push origin HEAD:${{ github.ref_name }}
