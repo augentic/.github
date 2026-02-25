@@ -10,7 +10,7 @@ on:
         description: "List of dependencies to ignore for cargo-outdated"
         type: string
     secrets:
-      CARGO_REGISTRIES_TOKEN:
+      CARGO_REGISTRY_TOKEN:
         required: true
 
 concurrency:
@@ -20,7 +20,7 @@ permissions:
   contents: read
 env:
   RUSTFLAGS: -Dwarnings
-  CARGO_REGISTRIES_TOKEN: ${{ secrets.CARGO_REGISTRIES_TOKEN }}
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
   fetch:
