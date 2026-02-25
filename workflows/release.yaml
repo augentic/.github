@@ -13,7 +13,7 @@ on:
         default: minor
         type: string
     secrets:
-      CARGO_REGISTRIES_CREDIBIL_TOKEN:
+      CARGO_REGISTRIES_TOKEN:
         required: true
 
 permissions:
@@ -21,7 +21,7 @@ permissions:
   pull-requests: write
 
 env:
-  CARGO_REGISTRIES_CREDIBIL_TOKEN: ${{ secrets.CARGO_REGISTRIES_CREDIBIL_TOKEN }}
+  CARGO_REGISTRIES_TOKEN: ${{ secrets.CARGO_REGISTRIES_TOKEN }}
 
 jobs:
   skip:

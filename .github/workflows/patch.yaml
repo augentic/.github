@@ -12,14 +12,14 @@ on:
         type: string
         required: false
     secrets:
-      CARGO_REGISTRIES_CREDIBIL_TOKEN:
+      CARGO_REGISTRIES_TOKEN:
         required: true
 
 permissions:
   contents: write
 
 env:
-  CARGO_REGISTRIES_CREDIBIL_TOKEN: ${{ secrets.CARGO_REGISTRIES_CREDIBIL_TOKEN }}
+  CARGO_REGISTRIES_TOKEN: ${{ secrets.CARGO_REGISTRIES_TOKEN }}
 
 jobs:
   skip:
@@ -49,19 +49,11 @@ jobs:
         with:
           increment: patch
 
-      # TODO: Re-enable semver check with flag to skip for non-library repos
-      # - name: Check semver
-      #   uses: obi1kenobi/cargo-semver-checks-action@v2
-      #   with:
-      #     baseline-rev: ${{ github.ref_name }}
-      #     release-type: patch
-
       - name: Update release notes
         uses: augentic/.github/.github/actions/release-notes@main
         with:
           release-type: patch
           version: ${{ steps.patch.outputs.version }}
-          previous-version: ${{ steps.patch.outputs.previous-version }}
 
       - name: Push changes
         run: git push origin HEAD:${{ github.ref_name }}
