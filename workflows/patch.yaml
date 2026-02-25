@@ -12,14 +12,14 @@ on:
         type: string
         required: false
     secrets:
-      CARGO_REGISTRIES_CREDIBIL_TOKEN:
+      CARGO_REGISTRIES_TOKEN:
         required: true
 
 permissions:
   contents: write
 
 env:
-  CARGO_REGISTRIES_CREDIBIL_TOKEN: ${{ secrets.CARGO_REGISTRIES_CREDIBIL_TOKEN }}
+  CARGO_REGISTRIES_TOKEN: ${{ secrets.CARGO_REGISTRIES_TOKEN }}
 
 jobs:
   skip:
