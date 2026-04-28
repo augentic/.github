@@ -112,7 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: augentic/.github/.github/actions/cargo-cache@main
-      - run: cargo install --locked --git https://github.com/kbknapp/cargo-outdated
+      - run: cargo install --locked cargo-outdated
         env:
           CARGO_TARGET_DIR: ~/.cargo/bin
 
