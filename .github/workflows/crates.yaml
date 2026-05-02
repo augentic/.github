@@ -13,10 +13,10 @@ jobs:
   crates:
     name: Publish crates
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: augentic/.github/.github/actions/cargo-cache@main
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: Publish workspace crates
         if: startsWith(github.ref_name, 'release-')

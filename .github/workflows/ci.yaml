@@ -5,129 +5,111 @@ name: CI
 
 on:
   workflow_call:
-    inputs:
-      outdated:
-        description: "List of dependencies to ignore for cargo-outdated"
-        type: string
     secrets:
       CARGO_REGISTRY_TOKEN:
-        required: true
+        required: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
+
 env:
   RUSTFLAGS: -Dwarnings
-  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  CARGO_TERM_COLOR: always
 
 jobs:
-  fetch:
-    name: Fetch
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - run: cargo fetch
-
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - run: cargo clippy --all-features
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --locked --workspace --all-targets --all-features
 
   fmt:
     name: Format
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - run: |
-          rustup component add --toolchain nightly rustfmt
-          cargo +nightly fmt --all --check
+      - uses: actions/checkout@v6 
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo +nightly fmt --all --check
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 30
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - uses: taiki-e/install-action@nextest
-      - run: cargo nextest run --tests --all-features --no-tests=pass
+      - uses: actions/checkout@v6 
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - run: cargo nextest run --locked --tests --all-features --no-tests=pass
 
   test-doc:
     name: Test docs
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - name: Check if library target exists
-        id: lib
+      - uses: actions/checkout@v6 
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - id: lib
+        # Detect a library target via cargo metadata so we don't depend on
+        # cargo's stderr wording or pay for a throwaway compile.
         run: |
-          if cargo check --lib --workspace 2>&1 | grep -q 'no library targets found'; then
-            echo "exists=false" >> $GITHUB_OUTPUT
-          else
-            echo "exists=true" >> $GITHUB_OUTPUT
-          fi
-      - run: cargo test --doc --all-features --workspace
-        if: steps.lib.outputs.exists == 'true'
+          has_lib=$(cargo metadata --format-version 1 --no-deps \
+            | jq '[.packages[].targets[].kind[]
+                   | select(IN("lib","rlib","cdylib","dylib","staticlib","proc-macro"))]
+                   | length > 0')
+          echo "exists=$has_lib" >> "$GITHUB_OUTPUT"
+      - if: steps.lib.outputs.exists == 'true'
+        run: cargo test --doc --locked --all-features --workspace
+
+  doc:
+    name: Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v6 
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --no-deps --workspace --all-features --locked
 
   vet:
     name: Vet
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
+      - uses: actions/checkout@v6 
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-vet
       - run: cargo vet --locked
 
-  # miri:
-  #   name: Miri
-  #   runs-on: ubuntu-latest
-  #   needs: fetch
-  #   steps:
-  #     - uses: actions/checkout@v5
-  #     - uses: augentic/.github/.github/actions/cargo-cache@main
-  #     - run: |
-  #        rustup toolchain install nightly --component miri
-  #        rustup override set nightly
-  #        cargo miri setup
-  #     - uses: taiki-e/install-action@nextest
-  #     - run: cargo miri nextest --all --all-features --no-tests=pass
-
-  outdated:
-    name: Outdated
-    runs-on: ubuntu-latest
-    needs: fetch
-    steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
-      - run: cargo install --locked --git https://github.com/kbknapp/cargo-outdated
-        env:
-          CARGO_TARGET_DIR: ~/.cargo/bin
-
-      - run: cargo outdated --workspace --depth 1 --exit-code 1
-        if: ${{ inputs.outdated == '' }}
-      - run: cargo outdated --workspace --depth 1 --ignore ${{ inputs.outdated }} --exit-code 1
-        if: ${{ inputs.outdated != '' }}
-
   deny:
     name: Deny
     runs-on: ubuntu-latest
-    needs: fetch
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: augentic/.github/.github/actions/cargo-cache@main
+      - uses: actions/checkout@v6 
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          arguments: --workspace
+          arguments: --workspace --locked

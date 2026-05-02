@@ -31,6 +31,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: ${{ github.workflow }}-${{ inputs.package }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
@@ -40,15 +41,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
-      - uses: augentic/.github/.github/actions/cargo-cache@main
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: wasm32-wasip2
 
       - name: Build wasm component
         run: cargo build --package ${{ inputs.package }} --release --target wasm32-wasip2
 
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
