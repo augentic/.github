@@ -115,9 +115,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-outdated
-      # - run: cargo install --locked cargo-outdated
-      #   env:
-      #     CARGO_TARGET_DIR: ~/.cargo/bin
 
       - run: cargo outdated --workspace --depth 1 --exit-code 1
         if: ${{ inputs.outdated == '' }}
