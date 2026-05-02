@@ -38,7 +38,7 @@ jobs:
       notes: ${{ steps.notes.outputs.notes }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -50,10 +50,12 @@ jobs:
         uses: augentic/.github/.github/actions/cargo-version@main
 
       - name: Date release notes
+        env:
+          VERSION: ${{ steps.cargo.outputs.version }}
         run: |
           set -ex
           sed -i "s/^Unreleased/Released $(date +'%Y-%m-%d')/" RELEASES.md
-          git commit -am "Release ${{ steps.cargo.outputs.version }}"
+          git commit -am "Release $VERSION"
           git push origin
 
       - name: Output release notes

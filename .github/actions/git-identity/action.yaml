@@ -6,6 +6,9 @@ runs:
   steps:
     - name: Git config
       shell: bash
+      env:
+        ACTOR: ${{ github.actor }}
+        ACTOR_ID: ${{ github.actor_id }}
       run: |
-        git config user.name "${{ github.actor }}"
-        git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        git config user.name "$ACTOR"
+        git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"

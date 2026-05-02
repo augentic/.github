@@ -13,7 +13,6 @@ runs:
   using: composite
   steps:
     - name: Get previous version
-      if: ${{ inputs.previous-version == '' }}
       id: previous
       uses: actions/github-script@v8
       with:
@@ -30,14 +29,17 @@ runs:
       if: ${{ inputs.release-type != 'next' }}
       id: notes
       uses: actions/github-script@v8
+      env:
+        PREVIOUS_TAG: ${{ steps.previous.outputs.result }}
+        NEW_VERSION: ${{ inputs.version }}
       with:
         result-encoding: string
         script: |
           const response = await github.rest.repos.generateReleaseNotes({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            previous_tag_name: "${{ steps.previous.outputs.result }}",
-            tag_name: "v${{ inputs.version }}",
+            previous_tag_name: process.env.PREVIOUS_TAG,
+            tag_name: `v${process.env.NEW_VERSION}`,
           })
           return response.data.body;
 
@@ -45,19 +47,20 @@ runs:
     # Major/minor
     # -------------------------------------------
     - name: Create RELEASES.md
-      if: ${{ inputs.release-type == 'major' }} || ${{ inputs.release-type == 'minor' }}
+      if: ${{ inputs.release-type == 'major' || inputs.release-type == 'minor' }}
       shell: bash
+      env:
+        NOTES: ${{ steps.notes.outputs.result }}
       run: |
+        set -euo pipefail
         body=$(sed -n '/---/,$!p' RELEASES.md)
         archive=$(sed -n '/---/,$p' RELEASES.md)
-
-        cat > RELEASES.md <<EOF
-        $body
-
-        ${{ steps.notes.outputs.result }}
-
-        $archive
-        EOF
+        {
+          printf '%s\n\n' "$body"
+          printf '%s\n\n' "$NOTES"
+          printf '%s\n' "$archive"
+        } > RELEASES.md.new
+        mv RELEASES.md.new RELEASES.md
 
     # -------------------------------------------
     # Patch
@@ -65,23 +68,20 @@ runs:
     - name: Patch RELEASES.md
       if: ${{ inputs.release-type == 'patch' }}
       shell: bash
+      env:
+        NOTES: ${{ steps.notes.outputs.result }}
       run: |
+        set -euo pipefail
         title=$(sed -n '1p' RELEASES.md)
         previous=$(cat RELEASES.md)
-
-        cat > RELEASES.md <<EOF
-        $title
-
-        Unreleased
-
-        ## Fixed
-
-        ${{ steps.notes.outputs.result }}
-
-        ---
-
-        $previous
-        EOF
+        {
+          printf '%s\n\n' "$title"
+          printf 'Unreleased\n\n## Fixed\n\n'
+          printf '%s\n\n' "$NOTES"
+          printf -- '---\n\n'
+          printf '%s\n' "$previous"
+        } > RELEASES.md.new
+        mv RELEASES.md.new RELEASES.md
 
     # -------------------------------------------
     # Next
@@ -89,36 +89,32 @@ runs:
     - name: Update archive list
       if: ${{ inputs.release-type == 'next' }}
       shell: bash
+      env:
+        REPOSITORY: ${{ github.repository }}
       run: |
-        set -ex
+        set -euxo pipefail
         title=$(sed -n '1p' RELEASES.md)
-        version=$(echo $title | sed 's/## //')
-        version_x=$(echo $version | sed 's/.$/x/')
-
-        sed -i "/ARCHIVE_START/a * [$version_x](https://github.com/${{ github.repository }}/blob/release-$version/RELEASES.md)" RELEASES.md
+        version=${title#"## "}
+        version_x="${version%?}x"
+        sed -i "/ARCHIVE_START/a * [${version_x}](https://github.com/${REPOSITORY}/blob/release-${version}/RELEASES.md)" RELEASES.md
 
     - name: Create next release notes
       if: ${{ inputs.release-type == 'next' }}
       shell: bash
       run: |
-        set -ex
-
+        set -euxo pipefail
         title=$(sed -n '1p' RELEASES.md)
         archive=$(sed -n '/---/,$p' RELEASES.md)
-
-        cat > RELEASES.md <<EOF
-        $title
-
-        Unreleased
-
-        ### Added
-
-        ### Changed
-
-        $archive
-        EOF
+        {
+          printf '%s\n\n' "$title"
+          printf 'Unreleased\n\n### Added\n\n### Changed\n\n'
+          printf '%s\n' "$archive"
+        } > RELEASES.md.new
+        mv RELEASES.md.new RELEASES.md
 
     - name: Update branch with changes
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
-        git commit -am "Update release notes for ${{ inputs.version }}"
+        git commit -am "Update release notes for $VERSION"

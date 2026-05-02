@@ -6,6 +6,13 @@ on:
       outdated:
         description: "List of dependencies to ignore for cargo-outdated"
         type: string
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      outdated:
+        description: "List of dependencies to ignore for cargo-outdated"
+        type: string
 
 permissions:
   contents: read
@@ -15,7 +22,6 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
@@ -27,7 +33,6 @@ jobs:
     name: Outdated
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
@@ -35,7 +40,9 @@ jobs:
         with:
           tool: cargo-outdated
 
-      - run: cargo outdated --workspace --depth 1 --exit-code 1
-        if: ${{ inputs.outdated == '' }}
-      - run: cargo outdated --workspace --depth 1 --ignore ${{ inputs.outdated }} --exit-code 1
-        if: ${{ inputs.outdated != '' }}
+      - env:
+          OUTDATED: ${{ inputs.outdated }}
+        run: |
+          args=(--workspace --depth 1 --exit-code 1)
+          [ -n "$OUTDATED" ] && args+=(--ignore "$OUTDATED")
+          cargo outdated "${args[@]}"
