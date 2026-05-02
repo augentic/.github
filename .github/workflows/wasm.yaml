@@ -60,9 +60,11 @@ jobs:
           INPUT_PACKAGE: ${{ inputs.package }}
           INPUT_RESOURCE_GROUP: ${{ inputs.resource-group }}
         run: |
-          echo "APP_NAME=${INPUT_APP_NAME:-$INPUT_PACKAGE}" >> "$GITHUB_ENV"
-          echo "WASM_FILE=${INPUT_PACKAGE//-/_}" >> "$GITHUB_ENV"
-          echo "RESOURCE_GROUP=$INPUT_RESOURCE_GROUP" >> "$GITHUB_ENV"
+          {
+            echo "APP_NAME=${INPUT_APP_NAME:-$INPUT_PACKAGE}"
+            echo "WASM_FILE=${INPUT_PACKAGE//-/_}"
+            echo "RESOURCE_GROUP=$INPUT_RESOURCE_GROUP"
+          } >> "$GITHUB_ENV"
 
       - name: Build wasm component
         env:
