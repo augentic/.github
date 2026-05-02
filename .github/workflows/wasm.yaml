@@ -28,6 +28,9 @@ on:
       AZURE_SUBSCRIPTION_ID:
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -41,49 +44,59 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@v6
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          key: wasm32-wasip2
+          targets: wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm32-wasip2-${{ inputs.package }}
+
+      - name: Resolve names
+        env:
+          INPUT_APP_NAME: ${{ inputs.app-name }}
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_RESOURCE_GROUP: ${{ inputs.resource-group }}
+        run: |
+          {
+            echo "APP_NAME=${INPUT_APP_NAME:-$INPUT_PACKAGE}"
+            echo "WASM_FILE=${INPUT_PACKAGE//-/_}"
+            echo "RESOURCE_GROUP=$INPUT_RESOURCE_GROUP"
+          } >> "$GITHUB_ENV"
 
       - name: Build wasm component
-        run: cargo build --package ${{ inputs.package }} --release --target wasm32-wasip2
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: cargo build --package "$PACKAGE" --release --target wasm32-wasip2 --locked
 
       - name: Azure login
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Upload wasm
+        env:
+          STORAGE_ACCOUNT: ${{ inputs.storage-account }}
         run: |
-          WASM_FILE=$(echo "${{ inputs.package }}" | tr - _)
-          APP_NAME=$(if [ -n "${{ inputs.app-name }}" ]; 
-            then echo "${{ inputs.app-name }}"; 
-            else echo "${{ inputs.package }}"; 
-          fi)
-
           az storage file upload \
-            --account-name ${{ inputs.storage-account }} \
+            --account-name "$STORAGE_ACCOUNT" \
             --share-name wasm \
-            --source ./target/wasm32-wasip1/release/$WASM_FILE.wasm \
-            --path $APP_NAME.wasm
+            --source "./target/wasm32-wasip2/release/${WASM_FILE}.wasm" \
+            --path "${APP_NAME}.wasm"
 
       - name: Restart Container App
         run: |
-          APP_NAME=$(if [ -n "${{ inputs.app-name }}" ]; 
-            then echo "${{ inputs.app-name }}"; 
-            else echo "${{ inputs.package }}"; 
-          fi)
-
           latestRevision=$(az containerapp revision list \
-            --name ca-$APP_NAME \
-            --resource-group ${{ inputs.resource-group }} \
-            --query '[?properties.active == `true`].name | @[0]')
+            --name "ca-$APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "[?properties.active].name | [0]" -o tsv)
+          test -n "$latestRevision" || { echo "no active revision"; exit 1; }
 
           az containerapp revision restart \
-            --name ca-$APP_NAME \
-            --resource-group ${{ inputs.resource-group }} \
-            --revision "${latestRevision//\"}"
+            --name "ca-$APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --revision "$latestRevision"

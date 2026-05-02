@@ -4,67 +4,63 @@ description: Get the version from Cargo.toml.
 inputs:
   increment:
     description: |
-      The version number or one of 'none', 'major', 'minor', 'patch'. 
+      The version number or one of 'none', 'major', 'minor', 'patch'.
       If 'none', the current version is returned.
     default: none
 
 outputs:
   version:
     description: Cargo version
-    value: ${{ steps.current.outputs.version }}
+    value: ${{ steps.read.outputs.version }}
 
 runs:
   using: composite
   steps:
-    - name: Read current version
-      id: current
-      shell: bash
-      run: |
-        version=$(grep '^version =' Cargo.toml | head -n 1 | sed 's/.*"\(.*\)"/\1/')
-        echo "version=$version" >> $GITHUB_OUTPUT
-
-    # -------------------------------------------
-    # Only increment version when requested
-    # -------------------------------------------
-    - name: Increment version
+    - name: Install cargo-edit
       if: ${{ inputs.increment != 'none' }}
-      id: increment
-      shell: bash
-      run: |
-        current=${{ steps.current.outputs.version }}
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-edit
 
-        case "${{ inputs.increment }}" in
-          major)
-            IFS='.' read -r major minor patch <<< "$current"
-            version="$((major + 1)).0.0"
-            ;;
-          minor)
-            IFS='.' read -r major minor patch <<< "$current"
-            version="$major.$((minor + 1)).0"
+    - name: Bump version
+      if: ${{ inputs.increment != 'none' }}
+      shell: bash
+      env:
+        INCREMENT: ${{ inputs.increment }}
+      run: |
+        set -euo pipefail
+        case "$INCREMENT" in
+          major|minor|patch)
+            cargo set-version --workspace --bump "$INCREMENT"
             ;;
           *)
-            IFS='.' read -r major minor patch <<< "$current"
-            version="$major.$minor.$((patch + 1))"
+            cargo set-version --workspace "$INCREMENT"
             ;;
         esac
-
-        echo "version=$version" >> $GITHUB_OUTPUT
-
-    - name: Update workspace
-      if: ${{ inputs.increment != 'none' }}
-      shell: bash
-      run: |
-        version=${{ steps.increment.outputs.version }}
-
-        # update workspace version including workspace crate references
-        sed -i "s/^version = .*/version = \"$version\"/1" Cargo.toml
-        sed -Ei "s/(^.*path = .*), version = \"[0-9.]+\"(.*$)/\1, version = \"$version\"\2/g" Cargo.toml
-        sed -Ei "s/(^.*)version = \"[0-9.]+\", (.*)(path = .*$)/\1version = \"$version\", \2 \3/g" Cargo.toml
-        
-        # update version in RELEASES.md
-        sed -i "1 s/^.*$/## $version/" RELEASES.md
-
-        # update versions in member crates
         cargo generate-lockfile
 
-        git commit -am "Increment Cargo version to $version"
+    - name: Read version
+      id: read
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(cargo metadata --no-deps --format-version 1 \
+          | jq -r '.packages[0].version')
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Update RELEASES.md heading
+      if: ${{ inputs.increment != 'none' }}
+      shell: bash
+      env:
+        VERSION: ${{ steps.read.outputs.version }}
+      run: |
+        set -euo pipefail
+        sed -i "1 s/^.*$/## $VERSION/" RELEASES.md
+
+    - name: Commit
+      if: ${{ inputs.increment != 'none' }}
+      shell: bash
+      env:
+        VERSION: ${{ steps.read.outputs.version }}
+      run: |
+        git commit -am "Increment Cargo version to $VERSION"
