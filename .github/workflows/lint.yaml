@@ -26,7 +26,9 @@ jobs:
       - uses: actions/checkout@v6
       - name: Download actionlint
         id: get_actionlint
-        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        # Pinned to the latest tagged release of actionlint so a compromise of
+        # the upstream `main` branch cannot inject arbitrary code into CI.
+        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash)
         shell: bash
       - name: Check workflow files
         run: ${{ steps.get_actionlint.outputs.executable }} -color
