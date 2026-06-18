@@ -5,6 +5,11 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      working-directory:
+        description: "Repo-root-relative directory holding the Cargo workspace (default: the repo root, for repos whose workspace is not in a subdirectory)."
+        type: string
+        default: "."
     secrets:
       CARGO_REGISTRY_TOKEN:
         required: false
@@ -31,7 +36,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+        working-directory: ${{ inputs.working-directory }}
 
   fmt:
     name: Format
@@ -43,6 +51,7 @@ jobs:
         with:
           components: rustfmt
       - run: cargo +nightly fmt --all --check
+        working-directory: ${{ inputs.working-directory }}
 
   test:
     name: Test
@@ -54,10 +63,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
       - run: cargo nextest run --locked --tests --all-features --no-tests=pass
+        working-directory: ${{ inputs.working-directory }}
 
   test-doc:
     name: Test docs
@@ -67,7 +79,10 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
       - id: lib
+        working-directory: ${{ inputs.working-directory }}
         # Detect a library target via cargo metadata so we don't depend on
         # cargo's stderr wording or pay for a throwaway compile.
         run: |
@@ -77,6 +92,7 @@ jobs:
                    | length > 0')
           echo "exists=$has_lib" >> "$GITHUB_OUTPUT"
       - if: steps.lib.outputs.exists == 'true'
+        working-directory: ${{ inputs.working-directory }}
         run: cargo test --doc --locked --all-features --workspace
 
   doc:
@@ -89,7 +105,10 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
       - run: cargo doc --no-deps --workspace --all-features --locked
+        working-directory: ${{ inputs.working-directory }}
 
   vet:
     name: Vet
@@ -99,10 +118,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-vet
       - run: cargo vet --locked
+        working-directory: ${{ inputs.working-directory }}
 
   deny:
     name: Deny
@@ -112,4 +134,5 @@ jobs:
       - uses: actions/checkout@v6
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
+          manifest-path: ${{ inputs.working-directory }}/Cargo.toml
           arguments: --workspace --locked
