@@ -122,7 +122,11 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-vet
+          # Pinned: install-action's prebuilt "latest" lags crates.io and
+          # currently resolves to 0.10.0, which cannot parse the
+          # `trusted-publisher` publisher metadata (crates.io Trusted
+          # Publishing) that cargo-vet >= 0.10.1 writes into imports.lock.
+          tool: cargo-vet@0.10.2
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}
 
