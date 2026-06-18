@@ -122,7 +122,7 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-vet
+          tool: cargo-vet@0.10.2
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}
 
