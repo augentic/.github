@@ -68,15 +68,16 @@ jobs:
     timeout-minutes: 30
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      CARGO_PROFILE_TEST_DEBUG: 0
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+      - uses: taiki-e/install-action@v2
         with:
           tool: rust,nextest
           fallback: none
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -91,21 +92,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+      - uses: taiki-e/install-action@v2
         with:
           tool: rust
           fallback: none
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - id: lib
         working-directory: ${{ inputs.working-directory }}
-        # Detect a library target via cargo metadata so we don't depend on
-        # cargo's stderr wording or pay for a throwaway compile.
+        # Detect a library target via cargo metadata
         run: |
           cargo metadata --format-version 1 --no-deps |
             jq -r '"exists=\(any(.packages[].targets[].kind[];
@@ -122,14 +122,14 @@ jobs:
     env:
       RUSTDOCFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+      - uses: taiki-e/install-action@v2
         with:
           tool: rust
           fallback: none
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -141,14 +141,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+      - uses: taiki-e/install-action@v2
         with:
           tool: rust,cargo-vet
           fallback: none
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -160,10 +160,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+      - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
           fallback: none
