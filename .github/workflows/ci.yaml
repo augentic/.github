@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       working-directory:
-        description: "Repo-root-relative directory holding the Cargo workspace (default: the repo root, for repos whose workspace is not in a subdirectory)."
+        description: Cargo workspace directory
         type: string
         default: "."
     secrets:
@@ -15,7 +15,7 @@ on:
         required: false
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -31,13 +31,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust+clippy
+          fallback: none
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: ${{ inputs.working-directory }}
+          # Only save caches on the default branch; PR caches would evict
+          # main's under the 10 GB per-repo cap.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
 
@@ -46,10 +52,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          components: rustfmt
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust@nightly+rustfmt
+          fallback: none
       - run: cargo +nightly fmt --all --check
         working-directory: ${{ inputs.working-directory }}
 
@@ -60,11 +69,17 @@ jobs:
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust,nextest
+          fallback: none
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: ${{ inputs.working-directory }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
@@ -76,21 +91,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust
+          fallback: none
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: ${{ inputs.working-directory }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - id: lib
         working-directory: ${{ inputs.working-directory }}
         # Detect a library target via cargo metadata so we don't depend on
         # cargo's stderr wording or pay for a throwaway compile.
         run: |
-          has_lib=$(cargo metadata --format-version 1 --no-deps \
-            | jq '[.packages[].targets[].kind[]
-                   | select(IN("lib","rlib","cdylib","dylib","staticlib","proc-macro"))]
-                   | length > 0')
-          echo "exists=$has_lib" >> "$GITHUB_OUTPUT"
+          cargo metadata --format-version 1 --no-deps |
+            jq -r '"exists=\(any(.packages[].targets[].kind[];
+              IN("lib", "rlib", "cdylib", "dylib", "staticlib", "proc-macro")))"' \
+              >> "$GITHUB_OUTPUT"
       - if: steps.lib.outputs.exists == 'true'
         working-directory: ${{ inputs.working-directory }}
         run: cargo test --doc --locked --all-features --workspace
@@ -102,11 +122,17 @@ jobs:
     env:
       RUSTDOCFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust
+          fallback: none
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: ${{ inputs.working-directory }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --no-deps --workspace --all-features --locked
         working-directory: ${{ inputs.working-directory }}
 
@@ -115,18 +141,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: rust,cargo-vet
+          fallback: none
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: ${{ inputs.working-directory }}
-      - uses: taiki-e/install-action@v2
-        with:
-          # Pinned: install-action's prebuilt "latest" lags crates.io and
-          # currently resolves to 0.10.0, which cannot parse the
-          # `trusted-publisher` publisher metadata (crates.io Trusted
-          # Publishing) that cargo-vet >= 0.10.1 writes into imports.lock.
-          tool: cargo-vet@0.10.2
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}
 
@@ -135,8 +160,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          manifest-path: ${{ inputs.working-directory }}/Cargo.toml
-          arguments: --workspace --locked
+          persist-credentials: false
+      - uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        with:
+          tool: cargo-deny
+          fallback: none
+      - run: cargo deny --workspace --locked check
+        working-directory: ${{ inputs.working-directory }}
