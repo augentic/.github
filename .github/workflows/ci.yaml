@@ -10,19 +10,7 @@ on:
         description: Cargo workspace directory
         type: string
         default: "."
-      owner:
-        description: Owner of a private Git dependency
-        type: string
-        default: ""
-      repository:
-        description: Name of a private Git dependency
-        type: string
-        default: ""
     secrets:
-      APP_CLIENT_ID:
-        required: false
-      APP_PRIVATE_KEY:
-        required: false
       CARGO_REGISTRY_TOKEN:
         required: false
 
@@ -44,14 +32,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -67,14 +47,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
@@ -90,14 +62,6 @@ jobs:
       CARGO_PROFILE_TEST_DEBUG: 0
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -114,14 +78,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -148,14 +104,6 @@ jobs:
       RUSTDOCFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -169,14 +117,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -193,14 +133,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: Private Git access
-        if: inputs.repository != ''
-        uses: augentic/.github/.github/actions/cargo-git-auth@main
-        with:
-          client-id: ${{ secrets.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ inputs.owner }}
-          repository: ${{ inputs.repository }}
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: ${{ inputs.working-directory }}/Cargo.toml
