@@ -80,10 +80,18 @@ jobs:
     needs: tag
     runs-on: ubuntu-latest
     steps:
+      - name: Download release artifacts
+        if: ${{ inputs.artifacts != '' }}
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ inputs.artifacts }}
+          path: artifacts
+          merge-multiple: true
+
       - uses: ncipollo/release-action@v1
         with:
           tag: ${{ needs.tag.outputs.tag }}
           name: Release ${{ needs.tag.outputs.tag }}
           body: ${{ needs.tag.outputs.notes }}
           immutableCreate: true
-          artifacts: ${{ inputs.artifacts }}
+          artifacts: artifacts/*
