@@ -26,8 +26,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Lockfile checks only (no rustc). Compile jobs wait so a known-bad
+  # crate cannot run build.rs / proc-macros before advisories fail.
+  deny:
+    name: Deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: ${{ inputs.working-directory }}/Cargo.toml
+          arguments: --workspace --locked
+
   clippy:
     name: Clippy
+    needs: deny
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -55,6 +69,7 @@ jobs:
 
   test:
     name: Test
+    needs: deny
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -74,6 +89,7 @@ jobs:
 
   test-doc:
     name: Test docs
+    needs: deny
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -98,6 +114,7 @@ jobs:
 
   doc:
     name: Docs
+    needs: deny
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -126,14 +143,3 @@ jobs:
           tool: cargo-vet@0.10.2
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}
-
-  deny:
-    name: Deny
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          manifest-path: ${{ inputs.working-directory }}/Cargo.toml
-          arguments: --workspace --locked
