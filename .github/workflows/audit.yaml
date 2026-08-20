@@ -16,6 +16,9 @@ on:
 
 permissions:
   contents: read
+  # rustsec/audit-check creates GitHub issues (schedule) and check runs.
+  issues: write
+  checks: write
 
 jobs:
   security_audit:
