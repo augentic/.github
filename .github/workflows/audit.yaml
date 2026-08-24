@@ -6,13 +6,6 @@ on:
       outdated:
         description: "List of dependencies to ignore for cargo-outdated"
         type: string
-  schedule:
-    - cron: '17 6 * * *'
-  workflow_dispatch:
-    inputs:
-      outdated:
-        description: "List of dependencies to ignore for cargo-outdated"
-        type: string
 
 permissions:
   contents: read
