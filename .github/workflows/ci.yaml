@@ -10,6 +10,10 @@ on:
         description: Cargo workspace directory
         type: string
         default: "."
+      targets:
+        description: Comma-separated rustup targets to install on compile jobs (e.g. wasm32-wasip2)
+        type: string
+        default: ""
     secrets:
       CARGO_REGISTRY_TOKEN:
         required: false
@@ -49,6 +53,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: ${{ inputs.targets }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
@@ -78,6 +83,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.targets }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
@@ -95,6 +102,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.targets }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
@@ -122,6 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.targets }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
