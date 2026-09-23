@@ -11,7 +11,10 @@ on:
         type: string
         default: "."
       targets:
-        description: Comma-separated rustup targets to install on compile jobs (e.g. wasm32-wasip2)
+        description: >-
+          Comma-separated rustup targets to install on compile jobs (e.g.
+          wasm32-wasip2). Clippy also runs once per target so code gated to
+          those targets is linted.
         type: string
         default: ""
     secrets:
@@ -47,7 +50,7 @@ jobs:
     name: Clippy
     needs: deny
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -59,6 +62,24 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
+      # The host pass above never compiles code behind
+      # `cfg(target_arch = "wasm32")` (guest modules, `[target.'cfg(...)']`
+      # deps, cdylib example guests), so lint each requested target too.
+      # `--all-targets` mirrors the host pass so target-gated tests and
+      # benches are linted rather than silently skipped.
+      - if: inputs.targets != ''
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          IFS=',' read -ra targets <<< "$TARGETS"
+          for target in "${targets[@]}"; do
+            target="${target// /}"
+            [ -n "$target" ] || continue
+            echo "::group::cargo clippy --target $target"
+            cargo clippy --locked --workspace --all-targets --all-features --target "$target" -- -D warnings
+            echo "::endgroup::"
+          done
 
   fmt:
     name: Format
