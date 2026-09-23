@@ -63,10 +63,7 @@ jobs:
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
       # The host pass above never compiles code behind
-      # `cfg(target_arch = "wasm32")` (guest modules, `[target.'cfg(...)']`
-      # deps, cdylib example guests), so lint each requested target too.
-      # `--all-targets` mirrors the host pass so target-gated tests and
-      # benches are linted rather than silently skipped.
+      # `cfg(target_arch = "wasm32")`, so lint each requested target too.
       - if: inputs.targets != ''
         working-directory: ${{ inputs.working-directory }}
         env:
