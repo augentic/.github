@@ -14,13 +14,95 @@ jobs:
     name: Publish crates
     if: startsWith(github.ref_name, 'release-')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # crates.io admits new crates slowly (see https://crates.io/docs/rate-limits);
+    # the publish step waits out 429s, so allow for several refill windows.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
 
+      # Re-runnable: members already on crates.io are excluded (otherwise
+      # `cargo publish --workspace` hard-fails), and a 429 from crates.io is
+      # waited out until the time it names, then retried with a fresh exclude
+      # list so anything published before the 429 is not attempted again.
       - name: Publish workspace crates
-        run: cargo publish --workspace --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          MAX_ATTEMPTS: 12
+        run: |
+          set -euo pipefail
+
+          # Workspace members that publish to crates.io, as "name version".
+          # `publish = false` members are skipped by cargo itself; members
+          # bound to another registry are left to cargo (they cannot be
+          # probed here) and are never excluded.
+          members=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[]
+                | select(.publish == null or .publish == ["crates-io"])
+                | "\(.name) \(.version)"')
+
+          # Print the name of each member already on crates.io, one per line.
+          published() {
+            local name version status
+            while read -r name version; do
+              [ -n "$name" ] || continue
+              status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                --header 'User-Agent: augentic-ci (https://github.com/augentic/.github)' \
+                "https://crates.io/api/v1/crates/$name/$version")
+              case "$status" in
+                200) echo "::notice::$name@$version is already published; skipping" >&2
+                     echo "$name" ;;
+                404) ;;
+                *) echo "::error::crates.io returned HTTP $status for $name@$version" >&2
+                   return 1 ;;
+              esac
+            done <<< "$members"
+          }
+
+          total=$(grep -c . <<< "$members" || true)
+          if [ "$total" -eq 0 ]; then
+            echo "No workspace members publish to crates.io; nothing to do"
+            exit 0
+          fi
+
+          attempt=1
+          while :; do
+            already=$(published)
+            exclude_args=()
+            excluded=0
+            while read -r name; do
+              [ -n "$name" ] || continue
+              exclude_args+=(--exclude "$name")
+              excluded=$(( excluded + 1 ))
+            done <<< "$already"
+            if [ "$excluded" -ge "$total" ]; then
+              echo "All $total publishable crates are already on crates.io; nothing to do"
+              exit 0
+            fi
+            echo "Publishing $(( total - excluded )) of $total crates (attempt $attempt/$MAX_ATTEMPTS)"
+
+            if cargo publish --workspace --locked ${exclude_args[@]+"${exclude_args[@]}"} 2>&1 | tee publish.log; then
+              exit 0
+            fi
+
+            # e.g. "... (status 429 Too Many Requests): You have published too many
+            # new crates in a short period of time. Please try again after
+            # Tue, 22 Sep 2026 02:44:43 GMT and see ..."
+            retry_after=$(sed -nE \
+              's/.*status 429.*[Tt]ry again after ([A-Za-z]{3}, [0-9]{1,2} [A-Za-z]{3} [0-9]{4} [0-9:]{8} GMT).*/\1/p' \
+              publish.log | head -n 1)
+            if [ -z "$retry_after" ]; then
+              echo "::error::cargo publish failed (not a crates.io rate limit); see log above"
+              exit 1
+            fi
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              echo "::error::crates.io is still rate limiting after $attempt attempts; re-run the job later"
+              exit 1
+            fi
+
+            wait_seconds=$(( $(date -d "$retry_after" +%s) - $(date +%s) + 30 ))
+            [ "$wait_seconds" -gt 30 ] || wait_seconds=30
+            echo "::warning::crates.io rate limited; retrying after $retry_after (sleeping ${wait_seconds}s)"
+            sleep "$wait_seconds"
+            attempt=$(( attempt + 1 ))
+          done

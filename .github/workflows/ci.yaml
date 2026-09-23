@@ -151,6 +151,10 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-vet@0.10.2
+          tool: cargo-binstall
+      # mozilla/cargo-vet ships no prebuilt binaries after 0.10.0, so
+      # install-action would warn and fall back to cargo-binstall anyway.
+      # 0.10.2 matches local development and `supply-chain/config.toml`.
+      - run: cargo binstall --no-confirm cargo-vet@0.10.2
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}

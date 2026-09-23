@@ -1,8 +1,11 @@
-# Keep SHA-pinned GitHub Actions up to date.
+# Keep GitHub Actions used by the reusable workflows and composite actions
+# up to date.
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     groups:

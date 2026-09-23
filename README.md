@@ -15,9 +15,9 @@ protection / required-status-checks fire on the PR.
 
 | Secret | Required | Used for |
 |---|---|---|
-| `APP_ID` | yes | App ID of a GitHub App installed on the repository with `contents: write` and `pull_requests: write` permissions. |
+| `APP_ID` | yes | App ID of a GitHub App installed on the repository with `contents: write` and `pull_requests: write` permissions. Passed to `actions/create-github-app-token` as `client-id` (see below). |
 | `APP_PRIVATE_KEY` | yes | PEM-encoded private key for the same GitHub App. |
-| `CARGO_REGISTRY_TOKEN` | yes | Token used by `cargo generate-lockfile` when private-registry dependencies are present. |
+| `CARGO_REGISTRY_TOKEN` | yes | Token used by `cargo update --workspace` when private-registry dependencies are present. |
 
 These secrets are validated before any job runs: a calling repository that
 inherits the workflow without `APP_ID` / `APP_PRIVATE_KEY` available fails
@@ -47,17 +47,41 @@ actor and lets CI run on the PR.
    - `APP_ID` — the numeric App ID.
    - `APP_PRIVATE_KEY` — the full PEM key, including the `BEGIN`/`END` lines.
 
+`actions/create-github-app-token` deprecated its `app-id` input in favour of
+`client-id`. The workflow passes `APP_ID` as `client-id`: GitHub accepts either
+the App ID or the Client ID as the JWT issuer, so the existing secret keeps
+working and nothing needs to be re-provisioned. If you would rather store the
+App's Client ID (`Iv1...`) in `APP_ID`, that works too.
+
+### `publish.yaml`
+
+No secrets beyond `GITHUB_TOKEN`. The workflow is safe to re-run after a
+partial failure (for example when the downstream `crates.yaml` job is rate
+limited): the `Release <version>` commit is only made when `RELEASES.md` still
+says `Unreleased`, the `v<version>` tag is only pushed when it does not already
+exist, and the GitHub release is skipped when one already exists for the tag.
+The tag job checks out the head of the release branch rather than the
+triggering commit so that a re-run sees the commit pushed by the earlier
+attempt.
+
 ### `crates.yaml`
 
 | Secret | Required | Used for |
 |---|---|---|
 | `CARGO_REGISTRY_TOKEN` | yes | Authenticates `cargo publish --workspace --locked`. |
 
+Re-runnable: workspace members already on crates.io at the current version are
+passed to `cargo publish` as `--exclude`, and when crates.io answers `429 Too
+Many Requests` (new crates are admitted slowly, see
+[crates.io rate limits](https://crates.io/docs/rate-limits)) the job sleeps
+until the time crates.io names and retries, up to 12 attempts. Any other
+publish failure fails the job immediately.
+
 ### `patch.yaml`
 
 | Secret | Required | Used for |
 |---|---|---|
-| `CARGO_REGISTRY_TOKEN` | yes | Token used by `cargo generate-lockfile` when private-registry dependencies are present. |
+| `CARGO_REGISTRY_TOKEN` | yes | Token used by `cargo update --workspace` when private-registry dependencies are present. |
 
 ### `wasm.yaml`
 

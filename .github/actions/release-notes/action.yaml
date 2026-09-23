@@ -5,6 +5,13 @@ inputs:
   version:
     description: The version to use for release notes.
     required: true
+  previous-version:
+    description: |
+      The version that precedes `version`. For 'next' this is the version
+      being released (used for the archive link); for 'patch' it is the
+      version being patched (used to re-title the previous notes).
+      Required for 'next' and 'patch'.
+    default: ""
   release-type:
     description: One of 'major', 'minor', 'patch', or 'next'.
     default: major
@@ -12,35 +19,71 @@ inputs:
 runs:
   using: composite
   steps:
+    # The highest semver tag strictly below `version`. This is correct on
+    # `main` (previous minor) and on a release branch (previous patch), even
+    # when newer minor releases have been tagged since the branch was cut.
     - name: Get previous version
+      if: ${{ inputs.release-type != 'next' }}
       id: previous
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
+      env:
+        NEW_VERSION: ${{ inputs.version }}
       with:
         result-encoding: string
         script: |
-          const tags = await github.rest.repos.listTags({
+          const parse = (name) => {
+            const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(name);
+            return match ? match.slice(1).map(Number) : null;
+          };
+          const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+          const target = parse(`v${process.env.NEW_VERSION}`);
+          if (!target) {
+            core.setFailed(`version '${process.env.NEW_VERSION}' is not MAJOR.MINOR.PATCH`);
+            return '';
+          }
+
+          const tags = await github.paginate(github.rest.repos.listTags, {
             owner: context.repo.owner,
             repo: context.repo.repo,
-            per_page: 2,
+            per_page: 100,
           });
-          return tags.data[1]?.name ?? '';
 
+          let previous = null;
+          for (const tag of tags) {
+            const parsed = parse(tag.name);
+            if (!parsed || compare(parsed, target) >= 0) continue;
+            if (!previous || compare(parsed, previous.parsed) > 0) {
+              previous = { name: tag.name, parsed };
+            }
+          }
+
+          core.info(`previous tag for v${process.env.NEW_VERSION}: ${previous?.name ?? '(none)'}`);
+          return previous?.name ?? '';
+
+    # `target_commitish` pins the notes to the triggering commit; without it
+    # GitHub compares against the default branch, which is wrong on release
+    # branches.
     - name: Generate release notes
       if: ${{ inputs.release-type != 'next' }}
       id: notes
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       env:
         PREVIOUS_TAG: ${{ steps.previous.outputs.result }}
         NEW_VERSION: ${{ inputs.version }}
       with:
         result-encoding: string
         script: |
-          const response = await github.rest.repos.generateReleaseNotes({
+          const params = {
             owner: context.repo.owner,
             repo: context.repo.repo,
-            previous_tag_name: process.env.PREVIOUS_TAG,
             tag_name: `v${process.env.NEW_VERSION}`,
-          })
+            target_commitish: context.sha,
+          };
+          if (process.env.PREVIOUS_TAG) {
+            params.previous_tag_name = process.env.PREVIOUS_TAG;
+          }
+          const response = await github.rest.repos.generateReleaseNotes(params);
           return response.data.body;
 
     # -------------------------------------------
@@ -65,20 +108,29 @@ runs:
     # -------------------------------------------
     # Patch
     # -------------------------------------------
+    # `cargo-version` has already rewritten line 1 to the patch version, so the
+    # previous notes are re-titled with `previous-version` before being
+    # appended below the new section.
     - name: Patch RELEASES.md
       if: ${{ inputs.release-type == 'patch' }}
       shell: bash
       env:
         NOTES: ${{ steps.notes.outputs.result }}
+        PREVIOUS_VERSION: ${{ inputs.previous-version }}
       run: |
         set -euo pipefail
+        if [ -z "$PREVIOUS_VERSION" ]; then
+          echo "::error::'previous-version' is required for release-type 'patch'"
+          exit 1
+        fi
         title=$(sed -n '1p' RELEASES.md)
-        previous=$(cat RELEASES.md)
+        previous=$(tail -n +2 RELEASES.md | sed '/./,$!d')
         {
           printf '%s\n\n' "$title"
-          printf 'Unreleased\n\n## Fixed\n\n'
+          printf 'Unreleased\n\n### Fixed\n\n'
           printf '%s\n\n' "$NOTES"
           printf -- '---\n\n'
+          printf '## %s\n\n' "$PREVIOUS_VERSION"
           printf '%s\n' "$previous"
         } > RELEASES.md.new
         mv RELEASES.md.new RELEASES.md
@@ -86,23 +138,28 @@ runs:
     # -------------------------------------------
     # Next
     # -------------------------------------------
+    # Link the archive entry to the release branch that was just cut, i.e. the
+    # *previous* version, not the bumped one already on line 1.
     - name: Update archive list
       if: ${{ inputs.release-type == 'next' }}
       shell: bash
       env:
         REPOSITORY: ${{ github.repository }}
+        PREVIOUS_VERSION: ${{ inputs.previous-version }}
       run: |
-        set -euxo pipefail
-        title=$(sed -n '1p' RELEASES.md)
-        version=${title#"## "}
-        version_x="${version%?}x"
-        sed -i "/ARCHIVE_START/a * [${version_x}](https://github.com/${REPOSITORY}/blob/release-${version}/RELEASES.md)" RELEASES.md
+        set -euo pipefail
+        if [ -z "$PREVIOUS_VERSION" ]; then
+          echo "::error::'previous-version' is required for release-type 'next'"
+          exit 1
+        fi
+        version_x="${PREVIOUS_VERSION%.*}.x"
+        sed -i "/ARCHIVE_START/a * [${version_x}](https://github.com/${REPOSITORY}/blob/release-${PREVIOUS_VERSION}/RELEASES.md)" RELEASES.md
 
     - name: Create next release notes
       if: ${{ inputs.release-type == 'next' }}
       shell: bash
       run: |
-        set -euxo pipefail
+        set -euo pipefail
         title=$(sed -n '1p' RELEASES.md)
         archive=$(sed -n '/---/,$p' RELEASES.md)
         {

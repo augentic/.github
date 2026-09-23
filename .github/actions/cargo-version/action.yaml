@@ -10,12 +10,24 @@ inputs:
 
 outputs:
   version:
-    description: Cargo version
+    description: Cargo version (after any increment)
     value: ${{ steps.read.outputs.version }}
+  previous:
+    description: Cargo version before the increment (equal to `version` when increment is 'none')
+    value: ${{ steps.previous.outputs.version }}
 
 runs:
   using: composite
   steps:
+    - name: Read previous version
+      id: previous
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(cargo metadata --no-deps --format-version 1 \
+          | jq -r '.packages[0].version')
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Install cargo-edit
       if: ${{ inputs.increment != 'none' }}
       uses: taiki-e/install-action@v2
@@ -37,7 +49,9 @@ runs:
             cargo set-version --workspace "$INCREMENT"
             ;;
         esac
-        cargo generate-lockfile
+        # Only re-resolve workspace members; `cargo generate-lockfile` would
+        # refresh every dependency and force a `cargo vet` regeneration.
+        cargo update --workspace
 
     - name: Read version
       id: read
