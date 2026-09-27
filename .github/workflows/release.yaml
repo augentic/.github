@@ -47,15 +47,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Composite actions from this repository at the same commit as this
+      # workflow, so a consumer pinned to a tag pins the actions too. Local
+      # `uses:` paths must live inside the workspace; the checkout is
+      # git-excluded so it never reaches the commits made below.
+      - name: Check out shared actions
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .augentic
+          persist-credentials: false
+      - run: echo '/.augentic/' >> .git/info/exclude
+
       - name: Git identity
-        uses: augentic/.github/.github/actions/git-identity@main
+        uses: ./.augentic/.github/actions/git-identity
 
       - name: Release version
         id: release
-        uses: augentic/.github/.github/actions/cargo-version@main
+        uses: ./.augentic/.github/actions/cargo-version
 
       - name: Update branch release notes
-        uses: augentic/.github/.github/actions/release-notes@main
+        uses: ./.augentic/.github/actions/release-notes
         with:
           release-type: major
           version: ${{ steps.release.outputs.version }}
@@ -73,17 +86,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # See the `create` job. The exclusion also keeps `.augentic/` out of
+      # the commit create-pull-request would otherwise make from the
+      # untracked files in the workspace.
+      - name: Check out shared actions
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .augentic
+          persist-credentials: false
+      - run: echo '/.augentic/' >> .git/info/exclude
+
       - name: Git identity
-        uses: augentic/.github/.github/actions/git-identity@main
+        uses: ./.augentic/.github/actions/git-identity
 
       - name: Bump version
         id: next
-        uses: augentic/.github/.github/actions/cargo-version@main
+        uses: ./.augentic/.github/actions/cargo-version
         with:
           increment: ${{ inputs.increment }}
 
       - name: Update release notes for next version
-        uses: augentic/.github/.github/actions/release-notes@main
+        uses: ./.augentic/.github/actions/release-notes
         with:
           release-type: next
           version: ${{ steps.next.outputs.version }}

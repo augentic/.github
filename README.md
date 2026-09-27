@@ -1,6 +1,53 @@
 # Shared GitHub Resources
 
-Shared Github CI and release workflows for Augentic repositories.
+Shared GitHub CI and release workflows for Augentic repositories. Consumers
+should pin a release tag (`@vX.Y.Z`) rather than `@main`; see
+[Versioning](#versioning).
+
+## Versioning
+
+This repository is released as `vX.Y.Z` tags with a matching GitHub release,
+starting at `v0.1.0`. While on `0.x`, a **minor** bump signals a breaking
+change (renamed inputs, changed behaviour, removed workflows) and a **patch**
+bump is a fix. Release notes live in [RELEASES.md](RELEASES.md).
+
+Pin the tag in every reference to this repository:
+
+```yaml
+jobs:
+  ci:
+    uses: augentic/.github/.github/workflows/ci.yaml@v0.1.0
+```
+
+```toml
+# mise.toml
+[task_config]
+includes = ["git::https://github.com/augentic/.github.git//mise/rust.toml?ref=v0.1.0"]
+```
+
+Because `release.yaml`, `publish.yaml` and `patch.yaml` resolve their
+composite actions at their own commit (see
+[Composite actions in reusable workflows](#composite-actions-in-reusable-workflows)),
+pinning the workflow tag pins everything it runs.
+
+Let Dependabot open bump PRs for the pinned workflows by adding a
+`github-actions` entry to the consuming repository's `.github/dependabot.yml`:
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+```
+
+`@main` still works for trying unreleased changes but is not the supported
+reference: it can change under a consumer at any time.
 
 ## Required secrets
 
@@ -90,3 +137,83 @@ publish failure fails the job immediately.
 | `AZURE_CLIENT_ID` | yes | OIDC federated identity for the Azure CLI. |
 | `AZURE_TENANT_ID` | yes | Azure tenant for the federated identity. |
 | `AZURE_SUBSCRIPTION_ID` | yes | Azure subscription containing the storage account and container app. |
+
+### `self-release.yaml`
+
+Not reusable; it tags and releases this repository (see
+[Releasing this repository](#releasing-this-repository)). No secrets beyond
+`GITHUB_TOKEN`.
+
+## Releasing this repository
+
+Maintainers cut a release of the shared workflows as follows:
+
+1. Open a PR that adds a new `## X.Y.Z` section at the top of
+   [RELEASES.md](RELEASES.md), above the previous version, and writes the
+   notes for it (`### Added` / `### Changed` / `### Fixed`). Line 1 of the
+   file is the version the `Release` workflow will tag. Squash-merge the PR.
+2. In Actions, run the **Release** workflow (`self-release.yaml`) on `main`.
+3. The workflow reads the version from line 1, pushes an annotated `vX.Y.Z`
+   tag at the head of `main`, and creates a GitHub release named
+   `Release vX.Y.Z` whose body is that section of `RELEASES.md` followed by
+   GitHub's generated "What's Changed" list (Dependabot PRs are filtered out
+   by [.github/release.yaml](.github/release.yaml)). The release is marked as
+   latest and created immutably.
+
+The workflow refuses to run when:
+
+- it is dispatched on a branch other than `main`;
+- line 1 of `RELEASES.md` is not exactly `## MAJOR.MINOR.PATCH`;
+- the section under line 1 is empty (write the notes first);
+- `vX.Y.Z` is already tagged **and** released, which means line 1 was not
+  bumped since the last release.
+
+It is safe to re-run after a partial failure: an existing tag without a
+release is reused, and an existing release is skipped.
+
+Unlike `publish.yaml` for the Rust repositories, nothing is committed back:
+`main` is governed by the organisation's **Merge** ruleset (PR with review and
+signed commits), so there is no `Released <date>` line in `RELEASES.md` and
+the date lives on the GitHub release. "Unreleased" is simply a version on
+line 1 that has no tag yet.
+
+## Conventions
+
+### Composite actions in reusable workflows
+
+A reusable workflow must never reference this repository's composite actions
+as `augentic/.github/.github/actions/<name>@main`: a consumer pinned to
+`@v0.1.0` would still run the actions from `main`. `uses:` cannot take an
+expression, so the tag cannot be substituted at release time either.
+
+Instead, each job that needs a composite action checks out this repository at
+the commit the reusable workflow itself is running from, using the `job`
+context, and references the actions by local path:
+
+```yaml
+      - uses: actions/checkout@v7            # consumer repository
+
+      - name: Check out shared actions
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .augentic
+          persist-credentials: false
+      - run: echo '/.augentic/' >> .git/info/exclude
+
+      - uses: ./.augentic/.github/actions/git-identity
+```
+
+Local `uses:` paths must live inside the workspace, so the checkout lands in
+`.augentic/` next to the consumer's code. The `.git/info/exclude` line hides
+it from git without touching tracked files, so neither `git commit -am` nor
+`peter-evans/create-pull-request` (which stages untracked files by default)
+can carry it into a consumer branch. The composite actions run with the
+workspace root as their working directory, so `cargo` and `git` still act on
+the consumer repository.
+
+`job.workflow_repository` / `job.workflow_sha` are newer than the `job`
+context type bundled with the pinned actionlint, so
+[.github/actionlint.yaml](.github/actionlint.yaml) ignores those two reports
+per workflow; add an entry there when a new workflow adopts the pattern.

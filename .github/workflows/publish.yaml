@@ -44,12 +44,25 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
+      # Composite actions from this repository at the same commit as this
+      # workflow, so a consumer pinned to a tag pins the actions too. Local
+      # `uses:` paths must live inside the workspace; the checkout is
+      # git-excluded so it never reaches the `Release <version>` commit.
+      - name: Check out shared actions
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .augentic
+          persist-credentials: false
+      - run: echo '/.augentic/' >> .git/info/exclude
+
       - name: Set git identity
-        uses: augentic/.github/.github/actions/git-identity@main
+        uses: ./.augentic/.github/actions/git-identity
 
       - name: Cargo version
         id: cargo
-        uses: augentic/.github/.github/actions/cargo-version@main
+        uses: ./.augentic/.github/actions/cargo-version
 
       - name: Date release notes
         env:

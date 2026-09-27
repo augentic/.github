@@ -40,12 +40,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Composite actions from this repository at the same commit as this
+      # workflow, so a consumer pinned to a tag pins the actions too. Local
+      # `uses:` paths must live inside the workspace; the checkout is
+      # git-excluded so it never reaches the commits made below.
+      - name: Check out shared actions
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .augentic
+          persist-credentials: false
+      - run: echo '/.augentic/' >> .git/info/exclude
+
       - name: Set git identity
-        uses: augentic/.github/.github/actions/git-identity@main
+        uses: ./.augentic/.github/actions/git-identity
 
       - name: Bump version
         id: patch
-        uses: augentic/.github/.github/actions/cargo-version@main
+        uses: ./.augentic/.github/actions/cargo-version
         with:
           increment: patch
 
@@ -57,7 +70,7 @@ jobs:
       #     release-type: patch
 
       - name: Update release notes
-        uses: augentic/.github/.github/actions/release-notes@main
+        uses: ./.augentic/.github/actions/release-notes
         with:
           release-type: patch
           version: ${{ steps.patch.outputs.version }}
