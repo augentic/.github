@@ -39,6 +39,7 @@ run = [
 
 [audit]
 description = "Check Cargo.lock against the RustSec advisory database"
+depends = ["install audit"]
 run = "cargo audit"
 
 [deny]
@@ -78,7 +79,7 @@ cargo outdated --workspace --exit-code 1 --depth 1 \
 
 [test]
 description = "nextest across every single-feature configuration (includes the examples gate)"
-depends = ["install hack"]
+depends = ["install hack", "install nextest"]
 env = { RUSTFLAGS = "-Dwarnings" }
 run = "cargo hack nextest run --workspace --each-feature --locked --no-tests=pass"
 
@@ -88,7 +89,7 @@ run = "cargo doc --no-deps --workspace --all-features --locked"
 
 [test-docs]
 description = "Run doc tests"
-run = "cargo test --doc --all-features --workspace"
+run = "cargo test --doc --all-features --workspace --locked"
 
 [vet]
 description = "Regenerate cargo-vet imports/exemptions/unpublished, then vet"
@@ -127,6 +128,6 @@ description = "Remove the target directory"
 run = "cargo clean"
 
 [sweep]
-description = "Removed old/unused build artifacts"
+description = "Remove old/unused build artifacts"
 depends = ["install sweep"]
 run = "cargo sweep --time 7"
