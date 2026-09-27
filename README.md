@@ -1,6 +1,6 @@
 # Shared GitHub Resources
 
-Shared Github CI and release workflows for Augentic repositories. Consumers
+Shared GitHub CI and release workflows for Augentic repositories. Consumers
 should pin a release tag (`@vX.Y.Z`) rather than `@main`; see
 [Versioning](#versioning).
 
