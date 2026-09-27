@@ -60,10 +60,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
-      # The host pass above never compiles code behind
-      # `cfg(target_arch = "wasm32")`, so lint each requested target too.
+      - run: cargo hack clippy --locked --workspace --each-feature --exclude-all-features -- -D warnings
+        working-directory: ${{ inputs.working-directory }}
+      # The host passes above never compile code behind
+      # `cfg(target_arch = "wasm32")`, so repeat both for each requested target.
       - if: inputs.targets != ''
         working-directory: ${{ inputs.working-directory }}
         env:
@@ -75,6 +80,9 @@ jobs:
             [ -n "$target" ] || continue
             echo "::group::cargo clippy --target $target"
             cargo clippy --locked --workspace --all-targets --all-features --target "$target" -- -D warnings
+            echo "::endgroup::"
+            echo "::group::cargo hack clippy --each-feature --target $target"
+            cargo hack clippy --locked --workspace --each-feature --exclude-all-features --target "$target" -- -D warnings
             echo "::endgroup::"
           done
 
@@ -108,8 +116,8 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: nextest
-      - run: cargo nextest run --locked --tests --workspace --all-features --no-tests=pass
+          tool: nextest,cargo-hack
+      - run: cargo hack nextest run --locked --tests --workspace --each-feature --no-tests=pass
         working-directory: ${{ inputs.working-directory }}
 
   test-doc:
