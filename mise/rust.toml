@@ -121,6 +121,7 @@ run = "cargo publish --workspace --locked --dry-run"
 
 [miri]
 description = "Run the test suite under Miri (nightly)"
+depends = ["install nextest"]
 run = ["cargo +nightly miri setup", "cargo +nightly miri nextest run --no-tests=pass"]
 
 [clean]
