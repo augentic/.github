@@ -117,7 +117,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest,cargo-hack
-      - run: cargo hack nextest run --locked --tests --workspace --each-feature --no-tests=pass
+      - run: cargo hack nextest run --locked --workspace --each-feature --no-tests=pass
         working-directory: ${{ inputs.working-directory }}
 
   test-doc:

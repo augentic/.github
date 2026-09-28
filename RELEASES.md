@@ -1,3 +1,11 @@
+## 0.1.1
+
+### Changed
+
+- `ci.yaml`: the `test` job no longer passes `--tests` to `cargo hack nextest run`,
+  which was building every test target per feature combination causing excessive
+  run time for little benefit.
+
 ## 0.1.0
 
 ### Added
