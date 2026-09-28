@@ -1,3 +1,17 @@
+## 0.1.2
+
+### Changed
+
+- `ci.yaml`: the `test` job runs `cargo nextest run --workspace --all-features`
+  once instead of `cargo hack nextest run --each-feature`. The per-feature
+  matrix rebuilt heavy dependencies for every crate/feature pair and ran the
+  slow integration tests serially, roughly doubling the job while executing
+  exactly the same set of tests; feature-gated tests in the consuming
+  repositories are all positively gated, so `--all-features` is a superset.
+  Per-feature compile coverage remains in the `clippy` job.
+- `mise/rust.toml`: the `test` task makes the same change so it keeps
+  mirroring CI, and no longer depends on `cargo-hack`.
+
 ## 0.1.1
 
 ### Changed

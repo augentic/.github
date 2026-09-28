@@ -116,8 +116,13 @@ jobs:
           workspaces: ${{ inputs.working-directory }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: nextest,cargo-hack
-      - run: cargo hack nextest run --locked --workspace --each-feature --no-tests=pass
+          tool: nextest
+      # One feature-unified build and one nextest scheduler across the whole
+      # workspace. Running per feature set with cargo-hack rebuilt heavy
+      # dependencies for every crate/feature pair and serialised the slow
+      # integration tests, roughly doubling the job for the same set of tests.
+      # Per-feature compile coverage lives in the clippy job.
+      - run: cargo nextest run --locked --workspace --all-features --no-tests=pass
         working-directory: ${{ inputs.working-directory }}
 
   test-doc:
