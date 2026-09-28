@@ -16,13 +16,13 @@ Pin the tag in every reference to this repository:
 ```yaml
 jobs:
   ci:
-    uses: augentic/.github/.github/workflows/ci.yaml@v0.1.0
+    uses: augentic/.github/.github/workflows/ci.yaml@v0.2.0
 ```
 
 ```toml
 # mise.toml
 [task_config]
-includes = ["git::https://github.com/augentic/.github.git//mise/rust.toml?ref=v0.1.0"]
+includes = ["git::https://github.com/augentic/.github.git//mise/rust.toml?ref=v0.2.0"]
 ```
 
 Because `release.yaml`, `publish.yaml` and `patch.yaml` resolve their
@@ -48,6 +48,105 @@ updates:
 
 `@main` still works for trying unreleased changes but is not the supported
 reference: it can change under a consumer at any time.
+
+## Consumer configuration
+
+A Rust repository adopts the shared tasks and CI with a `mise.toml` that
+includes [mise/rust.toml](mise/rust.toml) and a `ci.yaml` that calls the
+reusable workflow. Both read the same two knobs, so set them in both places:
+
+```toml
+# mise.toml
+[task_config]
+includes = ["git::https://github.com/augentic/.github.git//mise/rust.toml?ref=v0.2.0"]
+
+[env]
+# Space-separated workspace members `lint-wasm` clippies for wasm32-wasip2.
+# Unset = whole workspace. Same value as ci.yaml's `wasm-packages` input.
+WASM32_PACKAGES = "guest-crate examples"
+# Comma-separated crates `outdated` ignores. Same value as audit.yaml's
+# `outdated` input.
+OUTDATED_IGNORE = "cap-std,cap-primitives"
+
+# Repository-specific tasks go here; a local task with the same name as a
+# shared one shadows it.
+```
+
+```yaml
+# .github/workflows/ci.yaml
+jobs:
+  ci:
+    uses: augentic/.github/.github/workflows/ci.yaml@v0.2.0
+    with:
+      targets: wasm32-wasip2
+      wasm-packages: guest-crate examples
+    secrets: inherit
+```
+
+A `Makefile` that forwards `make <target>` to `mise run <target>` keeps
+`make lint` and friends working for people who have not adopted mise; it must
+not install mise itself.
+
+`mise run ci` runs the same checks as the workflow; `mise run check` adds the
+local-only advisories (`audit`, `outdated`, `deps`) and rewrites formatting in
+place.
+
+### The wasm32 lint pass
+
+The host clippy passes never compile code behind
+`cfg(target_arch = "wasm32")`, so when `targets` includes `wasm32-wasip2`
+(workflow) or `lint-wasm` runs (mise) clippy runs again for that target.
+The pass has one shape everywhere:
+
+- **Scope** is the whole workspace, or only the packages listed in
+  `wasm-packages` / `WASM32_PACKAGES`. Use the include list when host-only
+  crates (wasmtime, tokio, ...) share the workspace with guest components.
+- **Targets** are `--lib --bins --examples` with `--all-features`, then
+  `cargo hack clippy --each-feature --exclude-all-features` over cargo's
+  default targets (lib + bins). **Tests and benches are never built for
+  wasm32**: integration tests and their dev-dependencies are host-only in
+  most workspaces, and cargo-hack forwards `--lib`/`--examples` verbatim,
+  which errors on packages without those targets.
+- **Convention**: any bin or example in the wasm32 scope that is host-only
+  must be cfg-gated to an empty `main` on wasm32, e.g.
+
+  ```rust
+  cfg_if::cfg_if! {
+      if #[cfg(not(target_arch = "wasm32"))] {
+          // host-only imports and `main`
+      } else {
+          fn main() {}
+      }
+  }
+  ```
+
+  Libraries in scope must build for wasm32 with every single feature and with
+  all features at once. Integration tests may stay ungated, though workspaces
+  that already gate them with `#![cfg(not(target_arch = "wasm32"))]` lose
+  nothing.
+
+### Mirror: `ci.yaml` jobs and `mise/rust.toml` tasks
+
+The workflow keeps explicit cargo steps and `mise/rust.toml` mirrors them by
+hand. When you change one, change the other in the same PR.
+
+| `ci.yaml` job | `mise/rust.toml` task | Command |
+|---|---|---|
+| Format | `fmt-check` | `cargo +nightly fmt --all --check` |
+| Clippy (host steps) | `lint-host` | `cargo clippy --locked --workspace --all-targets --all-features`, `cargo hack clippy --locked --workspace --each-feature --exclude-all-features` |
+| Clippy (per-target step) | `lint-wasm` | `cargo clippy --locked <scope> --lib --bins --examples --all-features --target wasm32-wasip2`, `cargo hack clippy --locked <scope> --each-feature --exclude-all-features --target wasm32-wasip2` |
+| Test | `test` | `cargo nextest run --locked --workspace --all-features --no-tests=pass` |
+| Test docs | `test-docs` | `cargo test --doc --locked --all-features --workspace` |
+| Docs | `docs` | `cargo doc --no-deps --workspace --all-features --locked` with `RUSTDOCFLAGS=-Dwarnings` |
+| Vet | `vet` | `cargo vet --locked` |
+| Deny | `deny` | `cargo deny --workspace check` |
+
+All clippy/test/doc steps run with `RUSTFLAGS=-Dwarnings` (workflow-global
+`env`; per-task `env` in mise). `mise run ci` runs the tasks in the table
+order; `lint` runs `lint-host` then `lint-wasm`. Tasks with no CI job
+(`audit`, `outdated`, `deps`, `fmt`, `vet-regen`, `cov`, `publish`, `miri`,
+`clean`, `sweep`) are local helpers; `audit` and `outdated` correspond to the
+scheduled `audit.yaml` workflow instead.
 
 ## Required secrets
 

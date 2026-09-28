@@ -1,3 +1,42 @@
+## 0.2.0
+
+### Added
+
+- `ci.yaml`: new `wasm-packages` input (space-separated workspace members,
+  default empty = whole workspace) narrowing which packages the per-target
+  clippy passes lint. Workspaces that mix host-only crates with guest
+  components can now pass `targets: wasm32-wasip2` at all.
+- `mise/rust.toml`: `lint-host` and `lint-wasm` (the two halves of `lint`),
+  `fmt-check`, `vet-regen` and a `cov` coverage helper
+  (`cargo llvm-cov nextest --workspace --all-features --summary-only`).
+- `mise/rust.toml`: consumer knobs read from `[env]`: `WASM32_PACKAGES`
+  (mirrors `wasm-packages`) and `OUTDATED_IGNORE` (comma-separated, mirrors
+  `audit.yaml`'s `outdated` input).
+- README: consumer configuration, the wasm32 lint convention and a table
+  mapping each `ci.yaml` job to its `mise/rust.toml` task.
+
+### Changed
+
+- `ci.yaml` and `mise/rust.toml` (`lint-wasm`): the per-target clippy pass
+  builds `--lib --bins --examples` instead of `--all-targets`, and the
+  per-target `cargo hack clippy --each-feature` pass uses cargo's default
+  targets (lib + bins). Integration tests and benches, whose dev-dependencies
+  are host-only in most workspaces, are no longer compiled for wasm32.
+  Convention: any bin or example in the wasm32 scope that is host-only must be
+  cfg-gated to an empty `main` on wasm32.
+- `mise/rust.toml`: `vet` is now check-only (`cargo vet --locked`), matching
+  the CI `vet` job; the three `regenerate` steps moved to `vet-regen`.
+- `mise/rust.toml`: `ci` runs exactly the CI jobs
+  (`fmt-check`, `lint`, `test`, `test-docs`, `docs`, `vet`, `deny`).
+  `outdated` and `deps` remain in `check`; `fmt` no longer rewrites sources
+  as part of `ci`.
+- `mise/rust.toml`: `outdated` no longer hard-codes omnia's ignore list; set
+  `OUTDATED_IGNORE` instead.
+- `mise/rust.toml`: `lint` passes `--locked`; `RUSTFLAGS=-Dwarnings` is set
+  on `lint`, `test`, `test-docs` and `docs`, and `docs` also sets
+  `RUSTDOCFLAGS=-Dwarnings`, so `mise run ci` matches the workflow's global
+  environment.
+
 ## 0.1.2
 
 ### Changed

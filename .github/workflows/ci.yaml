@@ -13,8 +13,15 @@ on:
       targets:
         description: >-
           Comma-separated rustup targets to install on compile jobs (e.g.
-          wasm32-wasip2). Clippy also runs once per target so code gated to
-          those targets is linted.
+          wasm32-wasip2). Clippy also runs once per target over lib, bins and
+          examples (never tests or benches) so code gated to those targets is
+          linted.
+        type: string
+        default: ""
+      wasm-packages:
+        description: >-
+          Space-separated workspace members linted for each of `targets`;
+          empty = whole workspace. Mirrors `WASM32_PACKAGES` in mise/rust.toml.
         type: string
         default: ""
     secrets:
@@ -68,21 +75,33 @@ jobs:
       - run: cargo hack clippy --locked --workspace --each-feature --exclude-all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
       # The host passes above never compile code behind
-      # `cfg(target_arch = "wasm32")`, so repeat both for each requested target.
+      # `cfg(target_arch = "wasm32")`, so repeat both for each requested target
+      # over lib + bins + examples only: integration tests and their
+      # dev-dependencies are host-only in most workspaces. The each-feature
+      # pass uses cargo's default targets (lib + bins) because cargo-hack
+      # forwards `--lib`/`--examples` verbatim to packages without them.
+      # Mirrors `lint-wasm` in mise/rust.toml.
       - if: inputs.targets != ''
         working-directory: ${{ inputs.working-directory }}
         env:
           TARGETS: ${{ inputs.targets }}
+          WASM_PACKAGES: ${{ inputs.wasm-packages }}
         run: |
+          scope=(--workspace)
+          if [ -n "$WASM_PACKAGES" ]; then
+            scope=()
+            read -ra packages <<< "$WASM_PACKAGES"
+            for package in "${packages[@]}"; do scope+=(-p "$package"); done
+          fi
           IFS=',' read -ra targets <<< "$TARGETS"
           for target in "${targets[@]}"; do
             target="${target// /}"
             [ -n "$target" ] || continue
-            echo "::group::cargo clippy --target $target"
-            cargo clippy --locked --workspace --all-targets --all-features --target "$target" -- -D warnings
+            echo "::group::cargo clippy ${scope[*]} --lib --bins --examples --target $target"
+            cargo clippy --locked "${scope[@]}" --lib --bins --examples --all-features --target "$target" -- -D warnings
             echo "::endgroup::"
-            echo "::group::cargo hack clippy --each-feature --target $target"
-            cargo hack clippy --locked --workspace --each-feature --exclude-all-features --target "$target" -- -D warnings
+            echo "::group::cargo hack clippy ${scope[*]} --each-feature --target $target"
+            cargo hack clippy --locked "${scope[@]}" --each-feature --exclude-all-features --target "$target" -- -D warnings
             echo "::endgroup::"
           done
 
