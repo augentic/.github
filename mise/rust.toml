@@ -77,11 +77,13 @@ cargo outdated --workspace --exit-code 1 --depth 1 \
   --ignore thiserror
 """
 
+# Mirrors the CI `test` job: one feature-unified build and one nextest run.
+# Per-feature compile coverage is `lint`'s job.
 [test]
-description = "nextest across every single-feature configuration (includes the examples gate)"
-depends = ["install hack", "install nextest"]
+description = "nextest across the workspace with all features (includes the examples gate)"
+depends = ["install nextest"]
 env = { RUSTFLAGS = "-Dwarnings" }
-run = "cargo hack nextest run --workspace --each-feature --locked --no-tests=pass"
+run = "cargo nextest run --workspace --all-features --locked --no-tests=pass"
 
 [docs]
 description = "Build rustdoc for the workspace"
