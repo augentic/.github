@@ -12,10 +12,8 @@ on:
         default: "."
       targets:
         description: >-
-          Comma-separated rustup targets to install on compile jobs (e.g.
-          wasm32-wasip2). Clippy also runs once per target over lib, bins and
-          examples (never tests or benches) so code gated to those targets is
-          linted.
+          Comma-separated rustup targets to install (e.g. wasm32-wasip2).
+          Clippy also lints lib/bins/examples once per target.
         type: string
         default: ""
       wasm-packages:
@@ -40,8 +38,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Lockfile checks only (no rustc). Compile jobs wait so a known-bad
-  # crate cannot run build.rs / proc-macros before advisories fail.
+  # Lockfile-only (no rustc). Compile jobs wait so a known-bad crate
+  # cannot run build.rs / proc-macros before advisories fail.
   deny:
     name: Deny
     runs-on: ubuntu-latest
@@ -67,20 +65,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+          cache-on-failure: true
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack
+
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
+        
       - run: cargo hack clippy --locked --workspace --each-feature --exclude-all-features -- -D warnings
         working-directory: ${{ inputs.working-directory }}
-      # The host passes above never compile code behind
-      # `cfg(target_arch = "wasm32")`, so repeat both for each requested target
-      # over lib + bins + examples only: integration tests and their
-      # dev-dependencies are host-only in most workspaces. The each-feature
-      # pass uses cargo's default targets (lib + bins) because cargo-hack
-      # forwards `--lib`/`--examples` verbatim to packages without them.
-      # Mirrors `lint-wasm` in mise/rust.toml.
+        
+      # Host passes skip `cfg(target_arch = "wasm32")` code, so repeat per
+      # target over lib/bins/examples (tests are host-only). The each-feature
+      # pass omits `--lib`/`--examples`: cargo-hack forwards them verbatim to
+      # packages lacking them. Mirrors `lint-wasm` in mise/rust.toml.
       - if: inputs.targets != ''
         working-directory: ${{ inputs.working-directory }}
         env:
@@ -114,6 +113,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
+          
       - run: cargo +nightly fmt --all --check
         working-directory: ${{ inputs.working-directory }}
 
@@ -133,14 +133,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+          cache-on-failure: true
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
-      # One feature-unified build and one nextest scheduler across the whole
-      # workspace. Running per feature set with cargo-hack rebuilt heavy
-      # dependencies for every crate/feature pair and serialised the slow
-      # integration tests, roughly doubling the job for the same set of tests.
-      # Per-feature compile coverage lives in the clippy job.
+
+      # Single all-features build: per-feature runs via cargo-hack roughly
+      # doubled the job for the same tests. Per-feature coverage is in clippy.
       - run: cargo nextest run --locked --workspace --all-features --no-tests=pass
         working-directory: ${{ inputs.working-directory }}
 
@@ -157,10 +156,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+          cache-on-failure: true
       - id: lib
         working-directory: ${{ inputs.working-directory }}
-        # Detect a library target via cargo metadata so we don't depend on
-        # cargo's stderr wording or pay for a throwaway compile.
+
+        # Detect a lib target via cargo metadata: no throwaway compile, no
+        # reliance on cargo's stderr wording.
         run: |
           has_lib=$(cargo metadata --format-version 1 --no-deps \
             | jq '[.packages[].targets[].kind[]
@@ -186,6 +187,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+          cache-on-failure: true
+
       - run: cargo doc --no-deps --workspace --all-features --locked
         working-directory: ${{ inputs.working-directory }}
 
@@ -199,12 +202,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ inputs.working-directory }}
+          cache-on-failure: true
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-binstall
-      # mozilla/cargo-vet ships no prebuilt binaries after 0.10.0, so
-      # install-action would warn and fall back to cargo-binstall anyway.
-      # 0.10.2 matches local development and `supply-chain/config.toml`.
+
+      # No prebuilt cargo-vet binaries after 0.10.0, so install-action would
+      # fall back to binstall anyway. 0.10.2 matches `supply-chain/config.toml`.
       - run: cargo binstall --no-confirm cargo-vet@0.10.2
       - run: cargo vet --locked
         working-directory: ${{ inputs.working-directory }}
