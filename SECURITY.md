@@ -9,8 +9,8 @@ Please do not open a public issue for a security problem.
 
 Report it privately through GitHub: open the affected repository's **Security**
 tab and choose **Report a vulnerability**. That opens a private advisory that
-only the maintainers can see, where the report, the fix, and the disclosure are
-coordinated. If a repository has private reporting switched off, open a private
+only the maintainers can see, where they confirm the problem before it is made
+public. If a repository has private reporting switched off, open a private
 advisory on [`augentic/toolkit`](https://github.com/augentic/toolkit/security/advisories/new)
 naming the affected repository, and the maintainers will move it.
 
@@ -23,21 +23,21 @@ A report is most useful with:
 
 ## What to expect
 
-- An acknowledgement within five working days.
-- An assessment of severity and the affected versions, shared with you in the
-  advisory.
-- A fix released as a patch of the current minor version, and a published
-  advisory crediting you unless you ask otherwise.
+Until 1.0, a vulnerability is fixed as an ordinary bug:
 
-Please give the maintainers reasonable time to release a fix before disclosing
-the problem publicly; ninety days from the acknowledgement is the default.
+- An acknowledgement within five working days.
+- Once the problem is confirmed, a public issue labelled `security` that states
+  its severity and the versions it affects. It credits you unless you ask
+  otherwise.
+- A fix on `main`, listed under **Security** in the next release's notes.
+
+The maintainers do not publish advisories or request CVEs before 1.0.
 
 ## Supported versions
 
 Augentic repositories are pre-1.0 and release from `main`. Security fixes land
-on `main` and ship in the next release; the `release-<version>` branch of the
-latest release receives a patch release where one exists. Older releases are
-not patched.
+on `main` and ship in the next release. They are not backported to earlier
+releases.
 
 ## Supply chain
 
